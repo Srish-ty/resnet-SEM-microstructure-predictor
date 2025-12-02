@@ -22,8 +22,8 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import os
 import pandas as pd
 
-excel_path = "/content/Results.xlsx"
-images_dir = "/content/sem_images"
+excel_path = "content\Results.xlsx"
+images_dir = "content\sem_images"
 
 # 1. Check Excel file and sheets
 xls = pd.ExcelFile(excel_path)
