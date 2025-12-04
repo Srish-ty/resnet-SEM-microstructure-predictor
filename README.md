@@ -56,12 +56,25 @@ The following experimental techniques are used:
 - **Strain Measurement System** → S–E butterfly loops
 - **Piezometer** → d₃₃ measurement
 
-> Add these images here:
-> images/xrd_pattern.png
-> images/sem_microstructure.png
-> images/dielectric_vs_temp.png
-> images/pe_loop.png
-> images/se_butterfly_loop.png
+### Images here:
+
+
+  
+<img src="https://github.com/user-attachments/assets/bd1cd0ec-4d63-487f-8772-8cd8c809656a" width="48%"/>
+
+ <img src="https://github.com/user-attachments/assets/7cf9c136-310c-4696-8804-47f694eab8f2" width="48%"/>
+<br/>
+
+
+<table>
+<tr>
+<td> <img src="https://github.com/user-attachments/assets/ba47cc15-fa30-4783-982d-0fcc1e84c6e3"/> </td>
+
+<td> <img src="https://github.com/user-attachments/assets/dbb17ce2-c6a7-4da6-bc83-eac7379e3c95"/> </td>
+
+<td> <img src="https://github.com/user-attachments/assets/e72e9451-4c29-4c28-b0cc-f0fe383e0173"/> </td>
+</tr>
+</table>
 
 ---
 
@@ -91,10 +104,11 @@ Predict the following properties:
 - Data Split: **80% Training / 20% Testing**
 - Evaluation Metrics: **R², MAE, RMSE**
 
-> Add ML output plots here:
-> images/ml_true_vs_predicted.png
-> images/ml_feature_importance.png
-> images/ml_error_plot.png
+> ML output plots:
+<img width="65%" alt="Screenshot 2025-12-01 153727" src="https://github.com/user-attachments/assets/93fc6b10-1a76-4bc3-9a31-b1e230d38123" />
+
+<img width="1832" height="763" alt="Screenshot 2025-12-01 153905" src="https://github.com/user-attachments/assets/f9031b4a-361f-4cf8-9424-f111725a40d5" />
+
 
 ---
 
@@ -117,18 +131,25 @@ Predict **average grain size directly from SEM microstructure images**.
 - Optimizer: **Adam**
 - Loss Function: **Mean Squared Error (MSE)**
 
-> Add DL images here:
-> images/sem_sample.png
-> images/dl_training_loss.png
-> images/dl_true_vs_predicted.png
+> DL images:
+<img width="1255" height="606" alt="Screenshot 2025-12-03 060559" src="https://github.com/user-attachments/assets/682b3118-0180-4571-b964-8491a063ba5f" />
+<img width="514" height="605" alt="Screenshot 2025-12-03 055549" src="https://github.com/user-attachments/assets/8a08f0a8-6d35-42ee-966f-bfa4ce5acc89" />
+
+
+<img width="370" height="150" alt="Screenshot 2025-12-03 061319" src="https://github.com/user-attachments/assets/5c085c56-b53a-45e2-adb4-5fd06492fa6d" />
+<img width="352" height="118" alt="Screenshot 2025-12-03 061358" src="https://github.com/user-attachments/assets/a6bc1320-7272-4e76-82ec-f2392657d842" />
+
+<img width="353" height="108" alt="Screenshot 2025-12-03 061527" src="https://github.com/user-attachments/assets/e6041d55-6439-4c2c-8683-9cce9a1b7d76" />
+<img width="351" height="129" alt="Screenshot 2025-12-03 061647" src="https://github.com/user-attachments/assets/eb4bc595-0319-45c4-a224-505d85d5be92" />
+
 
 ---
 
 ## ⚙️ Setup Instructions
 
 ```bash
-git clone <your-repo-link>
-cd <repo-name>
+git clone https://github.com/Srish-ty/resnet-SEM-microstructure-predictor
+cd resnet-SEM-microstructure-predictor
 pip install -r requirements.txt
 
 ```
@@ -141,7 +162,7 @@ jupyter notebook notebooks/dl_sem_grain_size_prediction.ipynb
 
 - ML successfully predicts electromechanical properties from composition.
 
-- DL model estimates grain size directly from SEM images.
+- DL model estimates grain size directly from SEM es.
 
 - Integration of ML + DL reduces experimental trial cycles.
 
@@ -151,7 +172,7 @@ jupyter notebook notebooks/dl_sem_grain_size_prediction.ipynb
 
 - Experimental data obtained from NBT–7BT Bi off-stoichiometric ceramic synthesis and characterization under Prof. Anupam Mishra.
 
-- Grain size labels extracted from experimental SEM image analysis.
+- Grain size labels extracted from experimental SEM e analysis.
 
 - ML datasets constructed using:
 
