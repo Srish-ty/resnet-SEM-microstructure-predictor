@@ -33,7 +33,7 @@ print(xls.sheet_names)
 print("\n---\n")
 
 # 2. Check images folder
-print("Images directory exists?", os.path.exists(images_dir))
+#print("Images directory exists?", os.path.exists(images_dir))
 print("Files in images_dir:")
 print(os.listdir(images_dir))
 
@@ -56,8 +56,7 @@ print(df_sample.columns)
 if "Length" in df_sample.columns:
     print("\nMean Length for this sheet:", df_sample["Length"].mean())
 else:
-    print("\n❌ 'Length' column not found after cleaning.")
-
+    print("\n 'Length' column not found after cleaning.")
 print("Testing filename matching logic...\n")
 
 for sheet in xls.sheet_names:
@@ -74,3 +73,274 @@ for sheet in xls.sheet_names:
     print("  Matched images:", matched)
     print("  Count:", len(matched))
     print("---")
+
+rows = []
+
+for sheet in xls.sheet_names:
+    # sample_id = number after "result_"
+    sample_id = (str(sheet).strip().split("_")[-1])
+    print(f"\nProcessing sheet: {sheet} -> sample_id: {sample_id}")
+
+    # read this sheet
+    df_sample = pd.read_excel(excel_path, sheet_name=sheet)
+    df_sample.columns = [str(c).strip() for c in df_sample.columns]
+
+    # find the length column (maybe "Length", "Length (µm)", etc.)
+    length_col = None
+    for c in df_sample.columns:
+        if "Length" in c:   # loose match
+            length_col = c
+            break
+
+    if length_col is None:
+        print("  No column containing 'Length' found, skipping this sheet.")
+        print("  Columns were:", df_sample.columns.tolist())
+        continue
+
+    grain_size = df_sample[length_col].mean()
+    print(f"  Using column '{length_col}', mean grain size = {grain_size:.3f}")
+
+    matched_count = 0
+    for fname in os.listdir(images_dir):
+        if fname.lower().endswith((".tif", ".tiff", ".png", ".jpg", ".jpeg")):
+            if fname.startswith(sample_id + "_"):
+                rows.append({
+                    "filename": fname,
+                    "sample_id": sample_id,
+                    "grain_size": grain_size
+                })
+                matched_count += 1
+
+    #print(f"  Images matched for sample_id '{sample_id}': {matched_count}")
+
+labels_df = pd.DataFrame(rows)
+#print("\nFinal labels_df head:")
+#print(labels_df.head())
+print("Total labeled images:", len(labels_df))
+
+labels_df.to_csv("/content/sem_labels.csv", index=False)
+
+labels_df = pd.read_csv("/content/sem_labels.csv")
+print(labels_df.head())
+print("\nUnique sample_ids:", labels_df["sample_id"].unique())
+print("\nGrain size stats:")
+print(labels_df["grain_size"].describe())
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+print("Grain size statistics:")
+print(labels_df["grain_size"].describe())
+
+# Create a figure with subplots
+fig, axes = plt.subplots(1, 3, figsize=(18, 5)) # 1 row, 3 columns
+
+# 1) Histogram of grain sizes
+axes[0].hist(labels_df["grain_size"], bins=8)
+axes[0].set_xlabel("Grain size (from Length mean)")
+axes[0].set_ylabel("Count")
+axes[0].set_title("Distribution of Grain Size (All SEM Images)")
+axes[0].grid(True)
+
+# 2) Bar plot: mean grain size per sample_id
+mean_by_sample = labels_df.groupby("sample_id")["grain_size"].mean()
+axes[1].bar(mean_by_sample.index.astype(str), mean_by_sample.values)
+axes[1].set_xlabel("Sample ID")
+axes[1].set_ylabel("Mean Grain Size")
+axes[1].set_title("Mean Grain Size per Sample")
+axes[1].grid(True)
+
+# 3) Scatter: image index vs grain size (just to see spread)
+axes[2].scatter(range(len(labels_df)), labels_df["grain_size"])
+axes[2].set_xlabel("Image index")
+axes[2].set_ylabel("Grain Size")
+axes[2].set_title("Grain Size per SEM Image")
+axes[2].grid(True)
+
+plt.tight_layout() # Adjust layout to prevent overlapping titles/labels
+plt.show()
+
+from sklearn.model_selection import train_test_split
+
+train_df, val_df = train_test_split(
+    labels_df,
+    test_size=0.35,
+    random_state=42,
+    shuffle=True   # no stratify for small dataset
+)
+
+train_df = train_df.reset_index(drop=True)
+val_df   = val_df.reset_index(drop=True)
+
+print("Train size:", len(train_df))
+print("Val size  :", len(val_df))
+
+print("\nTrain samples per ID:")
+print(train_df["sample_id"].value_counts())
+
+print("\nVal samples per ID:")
+print(val_df["sample_id"].value_counts())
+
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications.resnet50 import preprocess_input
+
+IMG_SIZE = (224, 224)
+BATCH_SIZE = 4  # small dataset -> small batch
+
+train_datagen = ImageDataGenerator(
+    preprocessing_function=preprocess_input,
+    horizontal_flip=True,
+    rotation_range=10,
+    zoom_range=0.1,
+)
+
+val_datagen = ImageDataGenerator(
+    preprocessing_function=preprocess_input
+)
+
+train_gen = train_datagen.flow_from_dataframe(
+    train_df,
+    directory=images_dir,
+    x_col="filename",
+    y_col="grain_size",
+    target_size=IMG_SIZE,
+    batch_size=BATCH_SIZE,
+    class_mode="raw",  # regression
+    shuffle=True
+)
+
+val_gen = val_datagen.flow_from_dataframe(
+    val_df,
+    directory=images_dir,
+    x_col="filename",
+    y_col="grain_size",
+    target_size=IMG_SIZE,
+    batch_size=BATCH_SIZE,
+    class_mode="raw",
+    shuffle=False
+)
+
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras import layers, models
+import tensorflow as tf
+
+base_model = ResNet50(
+    include_top=False,
+    weights="imagenet",
+    input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3)
+)
+
+# Freeze lower layers, fine-tune upper ~20
+for layer in base_model.layers[:-20]:
+    layer.trainable = False
+
+inputs = layers.Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
+x = base_model(inputs, training=False)
+x = layers.GlobalAveragePooling2D()(x)
+x = layers.Dense(128, activation="relu")(x)
+x = layers.Dropout(0.3)(x)
+outputs = layers.Dense(1, activation="linear")(x)  # regression for grain size
+
+model = models.Model(inputs, outputs)
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+    loss="mse",
+    metrics=["mae"]
+)
+
+model.summary()
+
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+
+callbacks = [
+    EarlyStopping(
+        monitor="val_loss",
+        patience=5,
+        restore_best_weights=True
+    ),
+    ModelCheckpoint(
+        "best_resnet50_grainsize.h5",
+        monitor="val_loss",
+        save_best_only=True
+    )
+]
+
+EPOCHS = 25
+
+history = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=EPOCHS,
+    callbacks=callbacks
+)
+
+# Plot training curves
+history_df = pd.DataFrame(history.history)
+
+# Create a figure with two subplots side by side
+fig, axes = plt.subplots(1, 2, figsize=(12, 4)) # 1 row, 2 columns
+
+# Plot Training & Validation Loss
+axes[0].plot(history_df["loss"], label="Train Loss")
+axes[0].plot(history_df["val_loss"], label="Val Loss")
+axes[0].set_xlabel("Epoch")
+axes[0].set_ylabel("MSE Loss")
+axes[0].set_title("Training & Validation Loss")
+axes[0].legend()
+axes[0].grid(True)
+
+# Plot Training & Validation MAE
+axes[1].plot(history_df["mae"], label="Train MAE")
+axes[1].plot(history_df["val_mae"], label="Val MAE")
+axes[1].set_xlabel("Epoch")
+axes[1].set_ylabel("MAE")
+axes[1].set_title("Training & Validation MAE")
+axes[1].legend()
+axes[1].grid(True)
+
+plt.tight_layout() # Adjust layout to prevent overlapping titles/labels
+plt.show()
+
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import numpy as np
+
+val_preds = model.predict(val_gen).flatten()
+val_true  = val_df["grain_size"].values
+
+mse = mean_squared_error(val_true, val_preds)
+mae = mean_absolute_error(val_true, val_preds)
+r2  = r2_score(val_true, val_preds)
+
+print(f"MSE: {mse:.3f}")
+print(f"MAE: {mae:.3f}")
+print(f"R² : {r2:.3f}")
+
+# True vs Predicted scatter
+plt.figure(figsize=(5, 5))
+plt.scatter(val_true, val_preds)
+min_v = min(val_true.min(), val_preds.min())
+max_v = max(val_true.max(), val_preds.max())
+plt.plot([min_v, max_v], [min_v, max_v], "r--")
+plt.xlabel("True Grain Size")
+plt.ylabel("Predicted Grain Size")
+plt.title("True vs Predicted Grain Size")
+plt.grid(True)
+plt.show()
+
+from tensorflow.keras.preprocessing import image
+
+test_row = val_df.iloc[0]   # We have to change the value here to selct an image
+
+test_path = os.path.join(images_dir, test_row["filename"])
+
+print("Image:", test_row["filename"])
+print("True grain size:", test_row["grain_size"])
+
+img = image.load_img(test_path, target_size=IMG_SIZE)
+x = image.img_to_array(img)
+x = np.expand_dims(x, axis=0)
+x = preprocess_input(x)
+
+pred_gs = model.predict(x)[0][0]
+print("Predicted grain size:", pred_gs)
